@@ -1,0 +1,117 @@
+name: Process Requirement
+
+# Triggered when a new .txt file is added to the requirements/ directory
+# or manually via workflow_dispatch
+
+on:
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - 'requirements/**.txt'
+  workflow_dispatch:
+    inputs:
+      requirement:
+        description: 'Business requirement text'
+        required: true
+        type: string
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+jobs:
+  generate-terraform:
+    name: Generate Terraform from Requirement
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Detect changed requirement files
+        id: detect
+        if: github.event_name == 'push'
+        run: |
+          CHANGED=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} \
+            | grep '^requirements/.*\.txt$' | head -1)
+          echo "req_file=$CHANGED" >> $GITHUB_OUTPUT
+          # Parse env from filename e.g. requirements/dev_mfa_action.txt -> dev
+          ENV=$(echo "$CHANGED" | sed 's|requirements/||' | cut -d'_' -f1)
+          if [[ "$ENV" != "dev" && "$ENV" != "staging" && "$ENV" != "prod" ]]; then
+            ENV="dev"
+          fi
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+
+      - name: Process requirement (from file)
+        if: github.event_name == 'push' && steps.detect.outputs.req_file != ''
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python scripts/requirement_processor.py \
+            --env "${{ steps.detect.outputs.environment }}" \
+            --file "${{ steps.detect.outputs.req_file }}"
+
+      - name: Process requirement (manual dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python scripts/requirement_processor.py \
+            --env "${{ inputs.environment }}" \
+            --requirement "${{ inputs.requirement }}"
+
+      - name: Check for generated files
+        id: check_files
+        run: |
+          COUNT=$(ls terraform/generated/*.tf 2>/dev/null | wc -l || echo 0)
+          echo "file_count=$COUNT" >> $GITHUB_OUTPUT
+
+      - name: Create pull request with generated Terraform
+        if: steps.check_files.outputs.file_count > 0
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: feat/iac-${{ inputs.environment || steps.detect.outputs.environment }}-${{ github.run_number }}
+          commit-message: "feat(iac): auto-generate terraform from requirement"
+          title: "feat(iac): New Auth0 resources [${{ inputs.environment || steps.detect.outputs.environment }}] #${{ github.run_number }}"
+          body: |
+            ## Auto-generated Auth0 Terraform Resources
+
+            This PR was created automatically by the IaC Automation pipeline.
+
+            **Environment:** `${{ inputs.environment || steps.detect.outputs.environment }}`
+            **Trigger:** ${{ github.event_name }}
+
+            ### What's included
+            - Generated Terraform files in `terraform/generated/`
+            - Resources follow naming convention: `{env}-{type}-{purpose}-v{version}`
+
+            ### Review checklist
+            - [ ] Review generated Terraform code
+            - [ ] Verify naming conventions are correct
+            - [ ] Check that `terraform plan` output (in the `terraform-plan` workflow) looks right
+            - [ ] Approve and merge to trigger `terraform apply`
+
+            ---
+            🤖 Generated with [Auth0 IaC Automation](https://github.com/Monoranjan/auth0-iac-automation)
+          labels: terraform,auto-generated

@@ -1,0 +1,29 @@
+# Terraform
+.terraform/
+.terraform.lock.hcl
+tfplan.binary
+*.tfplan
+plan_output.txt
+terraform/.terraform/
+terraform/*.lock.hcl
+
+# State files — tracked in Git intentionally under states/
+# Do NOT add states/ here
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+*.egg-info/
+
+# Secrets — never commit these
+*.tfvars.local
+secrets.auto.tfvars
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db

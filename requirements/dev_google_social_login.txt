@@ -1,0 +1,4 @@
+Add Google social login connection for the dev environment so users can sign in
+with their Google accounts. The connection should be linked to our existing
+single-page application dashboard client. Users should be able to use their
+corporate Google accounts to authenticate.

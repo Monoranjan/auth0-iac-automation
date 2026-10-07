@@ -1,0 +1,99 @@
+name: Terraform Apply
+
+# Runs on push to main — applies Terraform and commits state back to Git
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+
+jobs:
+  apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # Needed to commit state back to repo
+
+    environment: production   # Requires manual approval in GitHub (Settings > Environments)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.9"
+
+      - name: Restore Terraform state from Git
+        working-directory: terraform
+        run: |
+          mkdir -p ../states
+          echo "Using state file from Git (states/terraform.tfstate)"
+          ls -la ../states/ || echo "No state files yet (first run)"
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init
+
+      - name: Terraform Plan (pre-apply verification)
+        id: plan
+        working-directory: terraform
+        env:
+          TF_VAR_auth0_domain: ${{ secrets.AUTH0_DEV_DOMAIN }}
+          TF_VAR_auth0_client_id: ${{ secrets.AUTH0_DEV_CLIENT_ID }}
+          TF_VAR_auth0_client_secret: ${{ secrets.AUTH0_DEV_CLIENT_SECRET }}
+          TF_VAR_environment: dev
+        run: |
+          terraform plan \
+            -var-file="environments/dev/terraform.tfvars" \
+            -out=tfplan.binary \
+            -no-color
+
+      - name: Terraform Apply
+        id: apply
+        working-directory: terraform
+        env:
+          TF_VAR_auth0_domain: ${{ secrets.AUTH0_DEV_DOMAIN }}
+          TF_VAR_auth0_client_id: ${{ secrets.AUTH0_DEV_CLIENT_ID }}
+          TF_VAR_auth0_client_secret: ${{ secrets.AUTH0_DEV_CLIENT_SECRET }}
+          TF_VAR_environment: dev
+        run: |
+          terraform apply \
+            -auto-approve \
+            -no-color \
+            tfplan.binary
+
+      - name: Commit Terraform state back to Git
+        if: always() && steps.apply.outcome != 'skipped'
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add states/
+
+          # Only commit if state changed
+          if git diff --staged --quiet; then
+            echo "No state changes to commit."
+          else
+            git commit -m "chore(state): update terraform state after apply [skip ci]
+
+            Run: ${{ github.run_number }}
+            SHA: ${{ github.sha }}"
+            git push
+          fi
+
+      - name: Output applied resources
+        if: steps.apply.outcome == 'success'
+        working-directory: terraform
+        env:
+          TF_VAR_auth0_domain: ${{ secrets.AUTH0_DEV_DOMAIN }}
+          TF_VAR_auth0_client_id: ${{ secrets.AUTH0_DEV_CLIENT_ID }}
+          TF_VAR_auth0_client_secret: ${{ secrets.AUTH0_DEV_CLIENT_SECRET }}
+          TF_VAR_environment: dev
+        run: terraform output -json || echo "No outputs defined yet"

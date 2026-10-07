@@ -1,0 +1,82 @@
+---
+# Auth0 IaC Automation - Naming Conventions
+# Pattern: {env}-{resource_type}-{purpose}-v{version}
+
+environments:
+  - dev
+  - staging
+  - prod
+
+resource_types:
+  action:
+    prefix: "action"
+    terraform_resource: "auth0_action"
+    description: "Auth0 Actions (JS code running in login/mgmt flows)"
+  client:
+    prefix: "client"
+    terraform_resource: "auth0_client"
+    description: "Auth0 Applications (SPA, M2M, Native, Regular Web)"
+  connection:
+    prefix: "conn"
+    terraform_resource: "auth0_connection"
+    description: "Auth0 Connections (social, enterprise, database)"
+  api:
+    prefix: "api"
+    terraform_resource: "auth0_resource_server"
+    description: "Auth0 APIs / Resource Servers"
+  role:
+    prefix: "role"
+    terraform_resource: "auth0_role"
+    description: "Auth0 Roles for RBAC"
+
+naming_pattern: "{env}-{resource_type}-{purpose}-v{version}"
+
+# Examples:
+# prod-action-mfa-enforcement-v1
+# dev-client-spa-dashboard-v1
+# staging-conn-social-google-v1
+# prod-api-inventory-service-v1
+# dev-role-admin-v1
+
+file_naming:
+  terraform: "{resource_type}_{env}_{purpose}_v{version}.tf"
+  # Example: action_prod_mfa_enforcement_v1.tf
+
+terraform_id_pattern: "{resource_type}_{env}_{purpose}_v{version}"
+# Example: auth0_action.action_prod_mfa_enforcement_v1
+
+triggers:
+  post_login:
+    id: "post-login"
+    version: "v3"
+    keywords: ["login", "sign in", "authenticate", "mfa", "access", "post-login"]
+  pre_user_registration:
+    id: "pre-user-registration"
+    version: "v2"
+    keywords: ["register", "signup", "sign up", "create user", "pre-registration"]
+  post_user_registration:
+    id: "post-user-registration"
+    version: "v2"
+    keywords: ["after register", "post-registration", "welcome email", "onboarding"]
+  credentials_exchange:
+    id: "credentials-exchange"
+    version: "v2"
+    keywords: ["client credentials", "m2m", "machine to machine", "api access"]
+  send_phone_message:
+    id: "send-phone-message"
+    version: "v1"
+    keywords: ["sms", "phone", "otp", "text message"]
+
+client_types:
+  spa:
+    app_type: "spa"
+    keywords: ["spa", "single page", "react", "angular", "vue", "frontend"]
+  native:
+    app_type: "native"
+    keywords: ["mobile", "ios", "android", "react native", "flutter", "native"]
+  regular_web:
+    app_type: "regular_web"
+    keywords: ["web app", "server side", "mvc", "django", "rails", "express", "regular web"]
+  non_interactive:
+    app_type: "non_interactive"
+    keywords: ["m2m", "machine to machine", "service", "daemon", "cli", "backend", "api client"]

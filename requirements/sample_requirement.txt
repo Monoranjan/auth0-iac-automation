@@ -1,0 +1,5 @@
+Create an Auth0 action that enforces Multi-Factor Authentication (MFA) for all users
+during the login flow. The action should check if the user has enrolled in MFA and,
+if not, prompt them to set it up using Auth0's Guardian. Users with the role "admin"
+should always be required to complete MFA regardless of their enrollment status.
+This should be deployed in the dev environment first.
