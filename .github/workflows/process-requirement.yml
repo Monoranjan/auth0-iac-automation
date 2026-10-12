@@ -87,7 +87,7 @@ jobs:
       - name: Check for generated files
         id: check_files
         run: |
-          COUNT=$(ls terraform/generated/*.tf 2>/dev/null | wc -l || echo 0)
+          COUNT=$(ls terraform/*_v*.tf 2>/dev/null | wc -l || echo 0)
           echo "file_count=$COUNT" >> $GITHUB_OUTPUT
 
       - name: Create pull request with generated Terraform

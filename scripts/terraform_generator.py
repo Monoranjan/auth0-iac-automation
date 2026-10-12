@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-GENERATED_DIR = Path(__file__).parent.parent / "terraform" / "generated"
+GENERATED_DIR = Path(__file__).parent.parent / "terraform"
 
 
 def _indent(text: str, spaces: int = 2) -> str:
