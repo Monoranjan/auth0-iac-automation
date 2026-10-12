@@ -135,7 +135,7 @@ def call_ai(requirement: str) -> dict:
         from google.genai import types as genai_types
         client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
         response = client.models.generate_content(
-            model="gemini-2.0-flash",
+            model="gemini-3.8-flash",
             contents=prompt,
             config=genai_types.GenerateContentConfig(
                 system_instruction=SYSTEM_PROMPT,
