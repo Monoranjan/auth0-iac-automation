@@ -116,10 +116,11 @@ def _strip_fences(text: str) -> str:
 
 def _detect_provider() -> str:
     """Return which AI provider to use based on available env vars."""
-    if os.environ.get("GEMINI_API_KEY"):
-        return "gemini"
+    # Groq first — most reliable free tier
     if os.environ.get("GROQ_API_KEY"):
         return "groq"
+    if os.environ.get("GEMINI_API_KEY"):
+        return "gemini"
     if os.environ.get("ANTHROPIC_API_KEY"):
         return "anthropic"
     return "none"
