@@ -138,8 +138,8 @@ def call_ai(requirement: str) -> dict:
         from google.genai.errors import ServerError
 
         client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-        # Try models in order of stability; retry each up to 3 times on 503
-        models_to_try = ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-3.8-flash"]
+        # Try models in order; retry each up to 3 times on 503
+        models_to_try = ["gemini-flash-latest", "gemini-3.8-flash"]
         last_error = None
         for model_name in models_to_try:
             for attempt in range(3):
