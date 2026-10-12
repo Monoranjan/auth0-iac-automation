@@ -118,4 +118,3 @@ jobs:
 
             ---
             🤖 Generated with [Auth0 IaC Automation](https://github.com/Monoranjan/auth0-iac-automation)
-          labels: terraform,auto-generated
