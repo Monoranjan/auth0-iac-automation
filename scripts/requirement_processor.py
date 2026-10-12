@@ -131,13 +131,17 @@ def call_ai(requirement: str) -> dict:
     prompt = f"Business requirement:\n\n{requirement}\n\nGenerate the JSON plan."
 
     if provider == "gemini":
-        import google.generativeai as genai
-        genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            system_instruction=SYSTEM_PROMPT,
+        from google import genai
+        from google.genai import types as genai_types
+        client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+            config=genai_types.GenerateContentConfig(
+                system_instruction=SYSTEM_PROMPT,
+                temperature=0,
+            ),
         )
-        response = model.generate_content(prompt)
         raw = _strip_fences(response.text)
 
     elif provider == "groq":

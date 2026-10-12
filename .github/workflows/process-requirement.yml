@@ -46,7 +46,7 @@ jobs:
           cache: 'pip'
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt --quiet
 
       - name: Detect changed requirement files
         id: detect
