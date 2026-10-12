@@ -65,6 +65,8 @@ jobs:
       - name: Process requirement (from file)
         if: github.event_name == 'push' && steps.detect.outputs.req_file != ''
         env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           python scripts/requirement_processor.py \
@@ -74,6 +76,8 @@ jobs:
       - name: Process requirement (manual dispatch)
         if: github.event_name == 'workflow_dispatch'
         env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           python scripts/requirement_processor.py \

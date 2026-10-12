@@ -1,2 +1,6 @@
-anthropic>=0.40.0
 pyyaml>=6.0
+
+# AI providers — install whichever you use (all have free tiers):
+google-generativeai>=0.8.0   # Gemini: free 1500 req/day  → GEMINI_API_KEY
+groq>=0.11.0                  # Groq:   free 14400 req/day → GROQ_API_KEY
+anthropic>=0.40.0             # Claude: paid ~$0.001/req   → ANTHROPIC_API_KEY

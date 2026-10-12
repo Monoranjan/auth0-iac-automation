@@ -1,9 +1,14 @@
 """
 Auth0 IaC Automation - Requirement Processor
 =============================================
-Reads a plain-text business requirement, calls Claude AI to parse it,
+Reads a plain-text business requirement, calls an AI model to parse it,
 generates Terraform HCL with naming conventions, and optionally commits
 to Git and opens a pull request.
+
+Supported AI providers (set ONE of these env vars — free tiers available):
+  GEMINI_API_KEY    — Google Gemini 1.5 Flash (free: 1500 req/day) [RECOMMENDED]
+  GROQ_API_KEY      — Groq Llama 3.1 70B (free: 14400 req/day)
+  ANTHROPIC_API_KEY — Claude Haiku (paid, ~$0.001/req)
 
 Usage:
   python scripts/requirement_processor.py --env dev --requirement "Create an MFA enforcement action for login"
@@ -19,7 +24,6 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-import anthropic
 import yaml
 
 # Ensure scripts/ is on the path when run from repo root
@@ -97,28 +101,78 @@ For pre-user-registration: exports.onExecutePreUserRegistration = async (event, 
 """
 
 
-def call_claude(requirement: str) -> dict:
-    """Call Claude haiku to parse the requirement into a resource plan."""
-    client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+def _strip_fences(text: str) -> str:
+    """Remove markdown code fences that some models add."""
+    text = text.strip()
+    if text.startswith("```"):
+        text = text.split("```")[1]
+        if text.startswith("json"):
+            text = text[4:]
+        # Remove trailing fence
+        if "```" in text:
+            text = text[:text.rfind("```")]
+    return text.strip()
 
-    message = client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=4096,
-        system=SYSTEM_PROMPT,
-        messages=[
-            {
-                "role": "user",
-                "content": f"Business requirement:\n\n{requirement}\n\nGenerate the JSON plan.",
-            }
-        ],
-    )
 
-    raw = message.content[0].text.strip()
-    # Strip markdown fences if model added them
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
+def _detect_provider() -> str:
+    """Return which AI provider to use based on available env vars."""
+    if os.environ.get("GEMINI_API_KEY"):
+        return "gemini"
+    if os.environ.get("GROQ_API_KEY"):
+        return "groq"
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        return "anthropic"
+    return "none"
+
+
+def call_ai(requirement: str) -> dict:
+    """Call an AI model to parse the requirement. Uses whichever provider key is set."""
+    provider = _detect_provider()
+    prompt = f"Business requirement:\n\n{requirement}\n\nGenerate the JSON plan."
+
+    if provider == "gemini":
+        import google.generativeai as genai
+        genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+        model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash",
+            system_instruction=SYSTEM_PROMPT,
+        )
+        response = model.generate_content(prompt)
+        raw = _strip_fences(response.text)
+
+    elif provider == "groq":
+        from groq import Groq
+        client = Groq(api_key=os.environ["GROQ_API_KEY"])
+        response = client.chat.completions.create(
+            model="llama-3.1-70b-versatile",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=4096,
+            temperature=0,
+        )
+        raw = _strip_fences(response.choices[0].message.content)
+
+    elif provider == "anthropic":
+        import anthropic as _anthropic
+        client = _anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+        message = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=4096,
+            system=SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = _strip_fences(message.content[0].text)
+
+    else:
+        print("[ERROR] No AI provider key found. Set one of:")
+        print("  export GEMINI_API_KEY=...   (free, recommended)")
+        print("  export GROQ_API_KEY=...     (free)")
+        print("  export ANTHROPIC_API_KEY=... (paid)")
+        sys.exit(1)
+
+    print(f"  [AI] Provider: {provider}")
     return json.loads(raw)
 
 
@@ -300,13 +354,8 @@ def main():
     print(f"  Requirement :\n    {requirement[:200]}{'...' if len(requirement) > 200 else ''}")
     print("=" * 60 + "\n")
 
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        print("[ERROR] ANTHROPIC_API_KEY environment variable is not set.")
-        print("        Export it: export ANTHROPIC_API_KEY=sk-ant-...")
-        sys.exit(1)
-
-    print("[1/3] Sending requirement to Claude AI for analysis...")
-    plan = call_claude(requirement)
+    print("[1/3] Sending requirement to AI for analysis...")
+    plan = call_ai(requirement)
     summary = plan.get("summary", "Auth0 resource changes")
 
     print(f"\n[AI Plan] {summary}")
