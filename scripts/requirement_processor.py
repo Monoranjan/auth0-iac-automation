@@ -131,18 +131,43 @@ def call_ai(requirement: str) -> dict:
     prompt = f"Business requirement:\n\n{requirement}\n\nGenerate the JSON plan."
 
     if provider == "gemini":
+        import time
         from google import genai
         from google.genai import types as genai_types
+        from google.genai.errors import ServerError
+
         client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-        response = client.models.generate_content(
-            model="gemini-3.8-flash",
-            contents=prompt,
-            config=genai_types.GenerateContentConfig(
-                system_instruction=SYSTEM_PROMPT,
-                temperature=0,
-            ),
-        )
-        raw = _strip_fences(response.text)
+        # Try models in order of stability; retry each up to 3 times on 503
+        models_to_try = ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-3.8-flash"]
+        last_error = None
+        for model_name in models_to_try:
+            for attempt in range(3):
+                try:
+                    print(f"  [AI] Trying model: {model_name} (attempt {attempt + 1})")
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=prompt,
+                        config=genai_types.GenerateContentConfig(
+                            system_instruction=SYSTEM_PROMPT,
+                            temperature=0,
+                        ),
+                    )
+                    raw = _strip_fences(response.text)
+                    last_error = None
+                    break
+                except ServerError as e:
+                    last_error = e
+                    print(f"  [AI] {model_name} unavailable (503), retrying in {2 ** attempt}s...")
+                    time.sleep(2 ** attempt)
+                except Exception as e:
+                    last_error = e
+                    print(f"  [AI] {model_name} failed: {e}")
+                    break  # Non-503 error — try next model
+            if last_error is None:
+                break
+
+        if last_error is not None:
+            raise last_error
 
     elif provider == "groq":
         from groq import Groq
