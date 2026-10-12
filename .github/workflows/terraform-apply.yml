@@ -85,8 +85,9 @@ jobs:
 
             Run: ${{ github.run_number }}
             SHA: ${{ github.sha }}"
-            # Pull remote changes before pushing to avoid non-fast-forward rejection
-            git pull --rebase origin main
+            # Merge remote, keeping our (freshly applied) state on conflict
+            git fetch origin main
+            git merge -X ours origin/main --no-edit
             git push
           fi
 
